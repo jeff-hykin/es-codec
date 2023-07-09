@@ -8,6 +8,7 @@ const NUMBER = 0b00000110;
 const DATE = 0b00000111;
 const REGEX = 0b00101101;
 const GLOBAL_SYMBOL = 0b00101111;
+const URL_CODE = 0b00110000;
 const STRING = 0b00001000;
 const BIGINTN = 0b00001001;
 const BIGINTP = 0b00001010;
@@ -64,6 +65,8 @@ export function encode(x, referrables = []) {
         return encodeDate(x);
     if (x.constructor === RegExp)
         return encodeRegex(x);
+    if (x.constructor === URL)
+        return encodeUrl(x);
     /* lengthy types */
     if (x.constructor === BigInt)
         return encodeBigInt(x);
@@ -109,6 +112,8 @@ export function decode(buffer, cursor = { offset: 0 }, referrables = []) {
     if (typeTag === REGEX)
         return decodeRegex(buffer, cursor);
     if (typeTag === GLOBAL_SYMBOL)
+        return decodeGlobalSymbol(buffer, cursor);
+    if (typeTag === URL_CODE)
         return decodeGlobalSymbol(buffer, cursor);
     if (typeTag === BIGINTP)
         return decodeBigInt(buffer, cursor);
@@ -225,6 +230,15 @@ function encodeGlobalSymbol(symbol) {
 function decodeGlobalSymbol(buffer, cursor) {
     const decodedString = decodeString(buffer, cursor);
     return Symbol.for(decodedString)
+}
+function encodeUrl(url) {
+    // -1 chops off the always-added trailing backslash
+    const encodedBuffer = new TextEncoder().encode(url.href.slice(0,-1)).buffer;
+    return concatArrayBuffers(Uint8Array.of(URL_CODE).buffer, encodeVarint(encodedBuffer.byteLength).buffer, encodedBuffer);
+}
+function decodeUrl(buffer, cursor) {
+    const decodedString = decodeString(buffer, cursor);
+    return new URL(decodedString)
 }
 // benchmarks/bigint-encode.ts
 export function encodeBigInt(bigint) {
