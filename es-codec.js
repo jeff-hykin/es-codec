@@ -7,6 +7,7 @@ const REFERENCE = 0b00000101;
 const NUMBER = 0b00000110;
 const DATE = 0b00000111;
 const REGEX = 0b00101101;
+const GLOBAL_SYMBOL = 0b00101111;
 const STRING = 0b00001000;
 const BIGINTN = 0b00001001;
 const BIGINTP = 0b00001010;
@@ -53,6 +54,9 @@ export function encode(x, referrables = []) {
         return Uint8Array.of(TRUE).buffer;
     if (x === false)
         return Uint8Array.of(FALSE).buffer;
+    // global symbols only
+    if (typeof x == 'symbol' && x.description != undefined && x == Symbol.for(x.description))
+        return encodeGlobalSymbol(x);
     /* simple types */
     if (x.constructor === Number)
         return encodeNumber(x);
@@ -104,6 +108,8 @@ export function decode(buffer, cursor = { offset: 0 }, referrables = []) {
         return decodeDate(buffer, cursor);
     if (typeTag === REGEX)
         return decodeRegex(buffer, cursor);
+    if (typeTag === GLOBAL_SYMBOL)
+        return decodeGlobalSymbol(buffer, cursor);
     if (typeTag === BIGINTP)
         return decodeBigInt(buffer, cursor);
     if (typeTag === BIGINTN)
@@ -211,6 +217,14 @@ function decodeRegex(buffer, cursor) {
         + ((lastByte & REGEX_UNICODE_FLAG    ) > 0 ? "u" : "")
         + ((lastByte & REGEX_STICKY_FLAG     ) > 0 ? "y" : "");
     return new RegExp(decodedString.slice(0,-1), flags);
+}
+function encodeGlobalSymbol(symbol) {
+    const encodedBuffer = new TextEncoder().encode(symbol.description).buffer;
+    return concatArrayBuffers(Uint8Array.of(GLOBAL_SYMBOL).buffer, encodeVarint(encodedBuffer.byteLength).buffer, encodedBuffer);
+}
+function decodeGlobalSymbol(buffer, cursor) {
+    const decodedString = decodeString(buffer, cursor);
+    return Symbol.for(decodedString)
 }
 // benchmarks/bigint-encode.ts
 export function encodeBigInt(bigint) {
